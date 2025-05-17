@@ -186,7 +186,7 @@ void absVector(float* values, float* output, int N) {
 //  Note: Take a careful look at this loop indexing.  This example
 //  code is not guaranteed to work when (N % VECTOR_WIDTH) != 0.
 //  Why is that the case?
-  for (int i=0; i<N; i+=VECTOR_WIDTH) {
+  for (int i = 0; i < N + 1; i += VECTOR_WIDTH) {
 
     // All ones
     maskAll = _cs149_init_ones();
@@ -249,7 +249,37 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
+  __cs149_vec_float max = _cs149_vset_float(9.999999f);
+  __cs149_vec_int zeros = _cs149_vset_int(0);
+  __cs149_vec_int ones = _cs149_vset_int(1);
   
+  for (int i = 0; i < N; i += VECTOR_WIDTH) {
+    __cs149_mask maskALL, maskZERO, maskNOTZERO, maskMAX;
+    maskALL = _cs149_init_ones();
+
+    __cs149_vec_float x, result;
+    __cs149_vec_int exp;
+
+    _cs149_vload_float(x, values + i, maskALL);
+    _cs149_vload_int(exp, exponents + i, maskALL);
+    _cs149_vset_float(result, 1.0f, maskALL);
+      
+    _cs149_veq_int(maskZERO, exp, zeros, maskALL);
+    maskNOTZERO = _cs149_mask_not(maskZERO);
+    _cs149_vmult_float(result, result, x, maskNOTZERO);
+    _cs149_vsub_int(exp, exp, ones, maskNOTZERO);
+ 
+    while (_cs149_cntbits(maskNOTZERO) > 0) {
+      _cs149_veq_int(maskZERO, exp, zeros, maskALL);
+      maskNOTZERO = _cs149_mask_not(maskZERO);
+      _cs149_vmult_float(result, result, x, maskNOTZERO);
+      _cs149_vsub_int(exp, exp, ones, maskNOTZERO);
+    }
+
+    _cs149_vgt_float(maskMAX, result, max, maskALL);
+    _cs149_vmove_float(result, max, maskMAX);
+    _cs149_vstore_float(output+i, result, maskALL);
+  }
 }
 
 // returns the sum of all elements in values
@@ -270,11 +300,24 @@ float arraySumVector(float* values, int N) {
   //
   // CS149 STUDENTS TODO: Implement your vectorized version of arraySumSerial here
   //
+  __cs149_vec_float acc;
+  __cs149_mask all = _cs149_init_ones();
+  _cs149_vset_float(acc, 0.0f, all);
+
+  for (int i = 0; i < N; i += VECTOR_WIDTH) {
+    __cs149_vec_float x;
+    __cs149_mask all = _cs149_init_ones();
+    _cs149_vload_float(x, values + i, all);
+    _cs149_vadd_float(acc, acc, x, all);
+    }
   
-  for (int i=0; i<N; i+=VECTOR_WIDTH) {
+  int width = VECTOR_WIDTH;
+    while (width > 1) {
+        _cs149_hadd_float(acc, acc);
+        _cs149_interleave_float(acc, acc);
+        width /= 2;
+    }
 
-  }
-
-  return 0.0;
+    return acc.value[0];
 }
 
